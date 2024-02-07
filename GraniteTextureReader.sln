@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34408.163
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GraniteTextureReader", "GraniteTextureReader\GraniteTextureReader.csproj", "{52B5F38F-1B4C-4EAC-9144-D6314F57EE9B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{52B5F38F-1B4C-4EAC-9144-D6314F57EE9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52B5F38F-1B4C-4EAC-9144-D6314F57EE9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52B5F38F-1B4C-4EAC-9144-D6314F57EE9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52B5F38F-1B4C-4EAC-9144-D6314F57EE9B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4421ECBA-6EC9-412C-BDC1-B35457F32EE2}
+	EndGlobalSection
+EndGlobal
