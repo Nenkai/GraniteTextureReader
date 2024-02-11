@@ -29,19 +29,31 @@ public class GraniteProcessor
         Configuration.Default.PreferContiguousImageBuffers = true;
 
         _dir = Path.GetDirectoryName(Path.GetFullPath(tileSetFile));
+        // Console.WriteLine($"_dir {_dir}");
+        string outputPath = _dir + "\\_extracted";
+        // Console.WriteLine($"outputPath {outputPath}");
+        Directory.CreateDirectory(outputPath);
 
         using var fs = File.OpenRead(tileSetFile);
         TileSet = new TileSetFile();
         TileSet.Initialize(fs);
     }
 
-    public void ExtractAll()
+    public void Extract(int layer, string textureName = "")
     {
         var textures = TileSet.GetTextures();
+
         foreach (var textureItem in textures)
         {
             TextureDescriptor texture = TextureDescriptor.FromGDEXItem(textureItem);
-            ExtractTexture(texture.Name + ".png", texture, 0, 0);
+            if (!String.IsNullOrEmpty(textureName) && texture.Name != textureName) continue;
+            if (layer > -1)
+                ExtractTexture(texture.Name + $"_{layer}.png", texture, 0, layer);
+            else
+                for (int layerNum = 0; layerNum < 4; layerNum++)
+                {
+                    ExtractTexture(texture.Name + $"_{layerNum}.png", texture, 0, layerNum);
+                }
         }
     }
 
@@ -86,7 +98,7 @@ public class GraniteProcessor
         }
 
         Image<Rgba32> imagee = Image.LoadPixelData<Rgba32>(texturePixels, texture.Width, texture.Height);
-        imagee.Save(outputPath);
+        imagee.Save(_dir + "\\_extracted\\" + outputPath);
 
         ArrayPool<Rgba32>.Shared.Return(texturePixels);
     }
