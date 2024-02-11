@@ -23,10 +23,11 @@ internal class Program
     static void Main(string[] args)
     {
         Console.WriteLine("---------------------------------------------");
-        Console.WriteLine($"- GraniteTextureReader {Version} by Nenkai/WistfulHopes");
+        Console.WriteLine($"- GraniteTextureReader {Version} by Nenkai/WistfulHopes/AlphaSatanOmega");
         Console.WriteLine("---------------------------------------------");
         Console.WriteLine("- https://github.com/Nenkai");
         Console.WriteLine("- https://github.com/WistfulHopes");
+        Console.WriteLine("- https://github.com/AlphaSatanOmega");
         Console.WriteLine("---------------------------------------------");
 
         var p = Parser.Default.ParseArguments<ExtractVerbs, ExtractAllVerbs>(args);
