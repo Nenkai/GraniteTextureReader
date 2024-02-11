@@ -21,8 +21,8 @@ public class TextureDescriptor
         texture.Name = item[GDEXTags.Name].GetString();
         texture.Width = (ushort)item[GDEXTags.Width].GetShort();
         texture.Height = (ushort)item[GDEXTags.Height].GetShort();
-        texture.XXXX = (ushort)item[GDEXTags.XXXX].GetShort();
-        texture.YYYY = (ushort)item[GDEXTags.YYYY].GetShort();
+        texture.XXXX = (ushort)item[GDEXTags.X].GetShort();
+        texture.YYYY = (ushort)item[GDEXTags.Y].GetShort();
         return texture;
     }
 }

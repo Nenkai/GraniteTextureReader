@@ -10,19 +10,22 @@ namespace GraniteTextureReader.TileSet;
 
 public class LayerInfo
 {
-    public uint Unk { get; set; }
-    public uint DefaultRGBAMaybe { get; set; }
+    public DataType DataType { get; set; }
 
+    /// <summary>
+    /// RGBA
+    /// </summary>
+    public uint DefaultColor { get; set; }
 
     public void Read(BinaryStream bs)
     {
-        Unk = bs.ReadUInt32();
-        DefaultRGBAMaybe = bs.ReadUInt32();
+        DataType = (DataType)bs.ReadUInt32();
+        DefaultColor = bs.ReadUInt32();
     }
 
     public static uint GetSize(uint version)
     {
-        if (version != 6)
+        if (version < 4 || version > 6)
             throw new NotSupportedException($"Version {version} not supported");
 
         return 0x08;

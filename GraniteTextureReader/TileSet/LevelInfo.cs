@@ -28,7 +28,7 @@ public class LevelInfo
 
     public static uint GetSize(uint version)
     {
-        if (version != 6)
+        if (version < 4 || version > 6)
             throw new NotSupportedException($"Version {version} not supported");
 
         return 0x10;

@@ -27,7 +27,7 @@ public class ParameterBlockInfo
 
     public static uint GetSize(uint version)
     {
-        if (version == 6)
+        if (version == 5 || version == 6)
             return 0x14;
 
         throw new NotSupportedException();

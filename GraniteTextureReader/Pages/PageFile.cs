@@ -85,13 +85,29 @@ public class PageFile : IDisposable
         }
         else
         {
-            if (codec == 4)
+            if (codec == 1)
+            {
+                throw new NotSupportedException("Granite codec (1) is not supported");
+            }
+            // 3 is decompressed?
+            else if (codec == 4)
             {
                 // "QuartzFast?" aka "raw"/"lz4"/"lz40.1.0"?
+                // has a dictionary for decompression
                 throw new NotSupportedException("Quartzfast codec not supported");
             }
             else if (codec == 9)
             {
+                // bc7:
+                // <Configuration>
+                //  <TextureFormat>BC7</TextureFormat>
+                //  <Dithering>0</Dithering>
+                //  <Algorithm>lz77</Algorithm>
+                //  <AlgorithmVersion>fastlz0.1.0</AlgorithmVersion>
+                //  <SaveMip>1</>
+                //</Configuration >
+
+                // high compression will be lz4, lz40.1.0
                 read = FastLZ.Decompress(compressed, size, output, output.Length);
             }
             else

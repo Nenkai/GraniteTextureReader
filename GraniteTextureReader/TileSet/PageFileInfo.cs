@@ -24,13 +24,19 @@ public class PageFileInfo
         NumPages = bs.ReadUInt32();
         Checksum = bs.ReadBytes(0x10);
         Type = bs.ReadUInt32();
-        SizeInBytes = bs.ReadUInt32();
-        bs.ReadUInt32();
+
+        if (version >= 6)
+        {
+            SizeInBytes = bs.ReadUInt32();
+            bs.ReadUInt32();
+        }
     }
 
     public static uint GetSize(uint version)
     {
-        if (version == 6)
+        if (version == 5)
+            return 0x218;
+        else if (version == 6)
             return 0x220;
 
         throw new NotSupportedException();

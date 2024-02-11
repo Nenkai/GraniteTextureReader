@@ -109,6 +109,9 @@ public class GraniteProcessor : IDisposable
 
         Rgba32[] texturePixels = ArrayPool<Rgba32>.Shared.Rent(texture.Width * texture.Height);
 
+        // Layers explicitly can set a default image color.
+        texturePixels.AsSpan().Fill(new Rgba32(TileSet.LayerInfos[layer].DefaultColor));
+
         for (int currentTileY = 0; currentTileY < numYTiles; currentTileY++)
         {
             for (int currentTileX = 0; currentTileX < numXTiles; currentTileX++)

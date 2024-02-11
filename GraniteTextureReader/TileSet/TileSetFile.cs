@@ -45,7 +45,7 @@ public class TileSetFile
             throw new IOException("Invalid magic.");
 
         Version = bs.ReadUInt32();
-        if (Version != 6)
+        if (Version != 5 && Version != 6)
             throw new NotSupportedException("Only version 6 is supported.");
 
         if (Version >= 5)
@@ -56,7 +56,7 @@ public class TileSetFile
     private void InitializeV5orV6(BinaryStream bs)
     {
         bs.ReadUInt32();
-        byte[] guid = bs.ReadBytes(16);
+        byte[] guid = bs.ReadBytes(16); // Not a checksum
         uint numLayers = bs.ReadUInt32();
         ulong layersOffset = bs.ReadUInt64();
         uint numLevels = bs.ReadUInt32();
