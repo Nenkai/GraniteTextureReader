@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
 using Syroot.BinaryData;
 
-namespace GraniteTextureReader;
+namespace GraniteTextureReader.GDEX;
 
 public class GDEXItem
 {
@@ -18,9 +17,9 @@ public class GDEXItem
 
     public GDEXItem this[uint tag]
     {
-        get 
+        get
         {
-            foreach (var val in ((List<GDEXItem>)_value))
+            foreach (var val in (List<GDEXItem>)_value)
             {
                 if (val.Tag == tag)
                     return val;

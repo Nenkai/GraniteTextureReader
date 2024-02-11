@@ -25,4 +25,12 @@ public class LevelInfo
             TileInfos[i] = new TileInfo(bs.ReadInt32());
         
     }
+
+    public static uint GetSize(uint version)
+    {
+        if (version != 6)
+            throw new NotSupportedException($"Version {version} not supported");
+
+        return 0x10;
+    }
 }

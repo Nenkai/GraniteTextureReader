@@ -5,20 +5,22 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Buffers;
+using System.Xml.Serialization;
 
-using GraniteTextureReader.TileSet;
-using GraniteTextureReader.Pages;
+using Microsoft.Toolkit.HighPerformance;
 
 using BCnEncoder.Shared;
 
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using Microsoft.Toolkit.HighPerformance;
+
+using GraniteTextureReader.GDEX;
+using GraniteTextureReader.TileSet;
+using GraniteTextureReader.Pages;
 
 namespace GraniteTextureReader;
 
-
-public class GraniteProcessor
+public class GraniteProcessor : IDisposable
 {
     public TileSetFile TileSet { get; set; }
     public Dictionary<int, PageFile> PageFiles { get; set; } = [];
@@ -43,23 +45,59 @@ public class GraniteProcessor
     {
         var textures = TileSet.GetTextures();
 
-        foreach (var textureItem in textures)
+        Project project = TileSet.GetProject();
+
+        for (int i = 0; i < textures.Count; i++)
         {
+            GDEXItem? textureItem = textures[i];
+
             TextureDescriptor texture = TextureDescriptor.FromGDEXItem(textureItem);
-            if (!String.IsNullOrEmpty(textureName) && texture.Name != textureName) continue;
+            if (!string.IsNullOrEmpty(textureName) && texture.Name != textureName) 
+                continue;
+
             if (layer > -1)
-                ExtractTexture(texture.Name + $"_{layer}.png", texture, 0, layer);
+            {
+                string realName = string.Empty;
+                if (project is not null)
+                {
+                    ProjectAsset asset = project.ImportedAssets[i];
+                    ProjectAssetLayer layerAsset = asset.Layers[layer];
+                    ProjectAssetLayerTexturesTexture textureLayerAsset = layerAsset.Textures.Texture;
+                    realName = Path.GetFileName(textureLayerAsset.Src);
+                }
+
+                Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layer})");
+                string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layer}.png" : realName;
+                ExtractTexture(Path.ChangeExtension(outputName, ".png"), texture, 0, layer); // TODO: Preserve file type? .dds, tga, etc
+            }
             else
+            {
                 for (int layerNum = 0; layerNum < 4; layerNum++)
                 {
-                    ExtractTexture(texture.Name + $"_{layerNum}.png", texture, 0, layerNum);
+                    string realName = string.Empty;
+                    if (project is not null)
+                    {
+                        ProjectAsset asset = project.ImportedAssets[i];
+                        if (layerNum >= asset.Layers.Length)
+                            continue;
+
+                        ProjectAssetLayer layerAsset = asset.Layers[layerNum];
+                        ProjectAssetLayerTexturesTexture textureLayerAsset = layerAsset.Textures.Texture;
+                        realName = Path.GetFileName(textureLayerAsset.Src);
+                    }
+
+                    string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layerNum}" : realName;
+
+                    Console.WriteLine($"[{i+1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layerNum})");
+                    ExtractTexture(Path.ChangeExtension(outputName, ".png"), texture, 0, layerNum);
                 }
+            }
         }
     }
 
+
     public void ExtractTexture(string outputPath, TextureDescriptor texture, int level, int layer)
     {
-        Console.WriteLine($"Processing {texture.Name} ({texture.Width}x{texture.Height}, mip level {level}, layer {layer})");
         uint tileWidthNoBorder = TileSet.TileWidth - (2 * TileSet.TileBorder);
         uint tileHeightNoBorder = TileSet.TileHeight - (2 * TileSet.TileBorder);
 
@@ -75,11 +113,11 @@ public class GraniteProcessor
         {
             for (int currentTileX = 0; currentTileX < numXTiles; currentTileX++)
             {
-                LevelInfo levelInfo = TileSet.LevelInfo[level];
+                LevelInfo levelInfo = TileSet.LevelInfos[level];
 
                 int tX = (int)(texTileOfsX + currentTileX);
                 int tY = (int)(texTileOfsY + currentTileY);
-                TileInfo tileInfo = levelInfo.TileInfos[layer + TileSet.Layers.Length * (tY * levelInfo.NumTilesX + tX)];
+                TileInfo tileInfo = levelInfo.TileInfos[layer + TileSet.LayerInfos.Count * (tY * levelInfo.NumTilesX + tX)];
 
                 int outputX = (int)(currentTileX * tileWidthNoBorder);
                 int outputY = (int)(currentTileY * tileHeightNoBorder);
@@ -97,8 +135,8 @@ public class GraniteProcessor
             }
         }
 
-        Image<Rgba32> imagee = Image.LoadPixelData<Rgba32>(texturePixels, texture.Width, texture.Height);
-        imagee.Save(_dir + "\\_extracted\\" + outputPath);
+        Image<Rgba32> image = Image.LoadPixelData<Rgba32>(texturePixels, texture.Width, texture.Height);
+        image.Save(_dir + "\\_extracted\\" + outputPath);
 
         ArrayPool<Rgba32>.Shared.Return(texturePixels);
     }
@@ -118,5 +156,13 @@ public class GraniteProcessor
         }
 
         return pageFile.TranscodeTile(flatTileInfo.pageIndex, flatTileInfo.TileIndex);
+    }
+
+    public void Dispose()
+    {
+        foreach (var pageFile in PageFiles.Values)
+        {
+            pageFile?.Dispose();
+        }
     }
 }

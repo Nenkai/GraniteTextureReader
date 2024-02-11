@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GraniteTextureReader;
+namespace GraniteTextureReader.GDEX;
 
 public class GDEXTags
 {

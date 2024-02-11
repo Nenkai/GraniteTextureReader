@@ -4,6 +4,9 @@ using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
+
+using GraniteTextureReader.GDEX;
 using Syroot.BinaryData;
 
 namespace GraniteTextureReader.TileSet;
@@ -20,15 +23,20 @@ public class TileSetFile
     public uint CustomPageSize { get; set; }
     public uint NumPageFiles { get; set; }
 
-    public int[] Layers { get; set; }
-
     public GDEXItem Metadata { get; set; } = new GDEXItem();
     public List<FlatTileInfo> FlatTileInfos { get; set; } = [];
     public List<PageFileInfo> PageFileInfos { get; set; } = [];
-    public List<LevelInfo> LevelInfo { get; set; } = [];
+    public List<LayerInfo> LayerInfos { get; set; } = [];
+    public List<LevelInfo> LevelInfos { get; set; } = [];
     public Dictionary<uint, ParameterBlockInfo> ParameterBlockInfos { get; set; } = [];
 
     // Graphine::Granite::Internal::TiledFile::Initialize
+    public void Initialize(string file)
+    {
+        using var fs = File.OpenRead(file);
+        Initialize(fs);
+    }
+
     public void Initialize(Stream stream)
     {
         using var bs = new BinaryStream(stream);
@@ -41,7 +49,7 @@ public class TileSetFile
             throw new NotSupportedException("Only version 6 is supported.");
 
         if (Version >= 5)
-            InitializeV5orV6(bs); // 
+            InitializeV5orV6(bs);
     }
 
     // Graphine::Granite::Internal::TiledFile::InitializeV5orV6
@@ -82,6 +90,30 @@ public class TileSetFile
         ReadParameterBlock(bs, numParameterBlock, parameterBlocksOffset);
     }
 
+    public string GetProjectFile()
+    {
+        var proj = Metadata[GDEXTags.Project];
+        if (proj is null)
+            return string.Empty;
+
+        string projFile = proj.GetString();
+        return projFile;
+    }
+
+    public Project GetProject()
+    {
+        string projFile = GetProjectFile();
+        if (!string.IsNullOrEmpty(projFile))
+        {
+            XmlSerializer serializer = new XmlSerializer(typeof(Project));
+            Project project;
+            using (TextReader reader = new StringReader(projFile))
+                return (Project)serializer.Deserialize(reader);
+        }
+
+        return null;
+    }
+
     public List<GDEXItem> GetTextures()
     {
         GDEXItem atlas = Metadata[GDEXTags.Atlas];
@@ -92,11 +124,12 @@ public class TileSetFile
 
     private void ReadLayers(BinaryStream bs, uint count, ulong offset)
     {
-        Layers = new int[count];
         for (int i = 0; i < count; i++)
         {
-            Layers[i] = bs.ReadInt32();
-            bs.ReadInt32();
+            bs.Position = (long)offset + (count * LayerInfo.GetSize(Version));
+            var layer = new LayerInfo();
+            layer.Read(bs);
+            LayerInfos.Add(layer);
         }
     }
 
@@ -104,10 +137,10 @@ public class TileSetFile
     {
         for (int i = 0; i < count; i++)
         {
-            bs.Position = (long)offset + (i * 0x10);
+            bs.Position = (long)offset + (i * LevelInfo.GetSize(Version));
             var levelInfo = new LevelInfo();
-            levelInfo.Read(bs, Layers.Length);
-            LevelInfo.Add(levelInfo);
+            levelInfo.Read(bs, LayerInfos.Count);
+            LevelInfos.Add(levelInfo);
         }
     }
     private void ReadPageInfos(BinaryStream bs, ulong offset)

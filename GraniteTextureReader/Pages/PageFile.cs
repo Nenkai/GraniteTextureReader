@@ -19,7 +19,7 @@ using BCnEncoder.Shared;
 
 namespace GraniteTextureReader.Pages;
 
-public class PageFile
+public class PageFile : IDisposable
 {
     public const uint PAGE_FILE_MAGIC = 0x50415247;
 
@@ -120,5 +120,10 @@ public class PageFile
         }
 
         return colorBuffer;
+    }
+
+    public void Dispose()
+    {
+        _stream?.Dispose();
     }
 }

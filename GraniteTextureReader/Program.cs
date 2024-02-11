@@ -1,13 +1,4 @@
-﻿
-using SixLabors.ImageSharp.Textures;
-using SixLabors.ImageSharp.Textures.TextureFormats;
-using SixLabors.ImageSharp.Textures.TextureFormats.Decoding;
-
-using BCnEncoder.Decoder;
-using BCnEncoder.Shared;
-
-using GraniteTextureReader.TileSet;
-using GraniteTextureReader.Pages;
+﻿using GraniteTextureReader.TileSet;
 
 using CommandLine;
 
@@ -15,7 +6,7 @@ namespace GraniteTextureReader;
 
 internal class Program
 {
-    public const string Version = "0.1.0";
+    public const string Version = "1.0.0";
     
     //======================
     //Main Program
@@ -30,10 +21,11 @@ internal class Program
         Console.WriteLine("- https://github.com/AlphaSatanOmega");
         Console.WriteLine("---------------------------------------------");
 
-        var p = Parser.Default.ParseArguments<ExtractVerbs, ExtractAllVerbs>(args);
+        var p = Parser.Default.ParseArguments<ExtractVerbs, ExtractAllVerbs, ExtractProjectFileVerbs>(args);
     
         p.WithParsed<ExtractVerbs>(ExtractSpecific)
         .WithParsed<ExtractAllVerbs>(ExtractAll)
+        .WithParsed<ExtractProjectFileVerbs>(ExtractProjectFile)
         .WithNotParsed(HandleNotParsedArgs);
     }
 
@@ -45,7 +37,7 @@ internal class Program
     {
         if (!File.Exists(tileSetPath))
         {
-            Console.WriteLine($"ERROR: Index file '{tileSetPath}' does not exist.");
+            Console.WriteLine($"ERROR: Tile set file '{tileSetPath}' does not exist.");
             return;
         }
 
@@ -73,7 +65,7 @@ internal class Program
     {
         Console.Write("!!!Warning!!!" +
                       "\nExtracting all the textures of a .gts takes up a lot of disk space." +
-                      "\nMake sure you have enough extra space reserved on the same drive as your game installation." +
+                      "\nMake sure you have enough extra space reserved on the same drive." +
                       "\nAre you sure you want to continue?. [y/n]");
         if (Console.ReadKey().Key != ConsoleKey.Y)
         {
@@ -84,6 +76,37 @@ internal class Program
         Extract(verbs.TileSetPath, verbs.LayerToExtract);
     }
 
+    public static void ExtractProjectFile(ExtractProjectFileVerbs verbs)
+    {
+        if (!File.Exists(verbs.TileSetPath))
+        {
+            Console.WriteLine($"ERROR: Tile set file '{verbs.TileSetPath}' does not exist.");
+            return;
+        }
+
+        var tileSetFile = new TileSetFile();
+        try
+        {
+            tileSetFile.Initialize(verbs.TileSetPath);
+            var project = tileSetFile.GetProjectFile();
+            if (string.IsNullOrEmpty(project))
+            {
+                Console.WriteLine($"No project file in tile set.");
+                return;
+            }
+
+            string projPath = Path.GetDirectoryName(Path.GetFullPath(verbs.TileSetPath));
+            string outputPath = Path.Combine(projPath, "proj.xml");
+            File.WriteAllText(outputPath, project);
+
+            Console.WriteLine($"Project file extracted to {outputPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: Failed to extract from {verbs.TileSetPath} - {ex.Message}");
+            return;
+        }
+    }
 
     public static void HandleNotParsedArgs(IEnumerable<Error> errors)
     {
@@ -100,7 +123,7 @@ internal class Program
         [Option(
             't', "tileset", 
             Required = true, 
-            HelpText = "Input .gts file.")]
+            HelpText = "Input .gts file. NOTE: Only version 6 is supported.")]
         public string TileSetPath { get; set; }
 
         [Option(
@@ -112,7 +135,7 @@ internal class Program
         [Option(
             'l', "layer(s)", 
             Required = false, 
-            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2)", 
+            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.", 
             Default = (int)0)]
         public int LayerToExtract { get; set; }
     }
@@ -123,13 +146,13 @@ internal class Program
         [Option(
             't', "tileset", 
             Required = true, 
-            HelpText = "Input .gts file.")]
+            HelpText = "Input .gts file. NOTE: Only version 6 is supported.")]
         public string TileSetPath { get; set; }
 
         [Option(
             'l', "layer(s)", 
             Required = false, 
-            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2)", 
+            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.", 
             Default = (int)0)]
         public int LayerToExtract { get; set; }
 
@@ -138,5 +161,15 @@ internal class Program
 
         // [Option("overwrite", Required = false, HelpText = "Whether to overwrite if files have already been extracted.")]
         // public bool Overwrite { get; set; }
+    }
+
+    [Verb("extract-project-file", HelpText = "Extract the projects file out of the .gts tile set file (if one exists).")]
+    public class ExtractProjectFileVerbs
+    {
+        [Option(
+            't', "tileset",
+            Required = true,
+            HelpText = "Input .gts file.")]
+        public string TileSetPath { get; set; }
     }
 }
