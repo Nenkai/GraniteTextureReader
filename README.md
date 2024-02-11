@@ -1,9 +1,9 @@
 # GraniteTextureReader
 
-Texture Reader Tool for Granblue Fantasy: Relink Granite Tile Sheets (.gts)
+Texture Reader/Extractor for [Granite SDK](https://unity.com/products/granite-sdk) files (.gts/.gtp). This tool was primarly made with Granblue Fantasy: Relink in mind.
 
-## Usage
-Make sure you have extracted all the `.gts`, .`gtp` files under `Granblue Fantasy Relink\data\granite\<2/4>k\gts\<0,1,2>` using [GBFRDataTools](https://github.com/Nenkai/GBFRDataTools/releases).
+> [!IMPORTANT]  
+> Only version 6 `.gts` files are currently supported. (Version can be viewed at 0x04 in the .gts files)
 
 Layer Numbers
 * `-1` 	- Extracts all Texture layers
@@ -12,19 +12,19 @@ Layer Numbers
 * `2` 	- Extract RGB Mask 1 map layer
 * `3` 	- Extract RGB Mask 2 map layer
 
-Extract Single Texture from .gts
+### Extract Single Texture from .gts
 ```
 GraniteTextureReader.exe extract -t "<path to .gts>" -f "<granite texture name>" -l <layer number>
 ```
 
-Extract All Textures from .gts
+### Extract All Textures from .gts
 ```
 GraniteTextureReader.exe extract-all -t "<path to .gts>" -l <layer number>
 ```
 
-File types
-* `.gts` - Tile Sheet
-* `.gtp` - Tile Pack
+## File types
+* `.gts` - Tile Set
+* `.gtp` - Page File
 
 ## Finding a model's textures
 If you need to find a certain model's textures you'll need to run download and run flatc with the MMat_ModelMaterial.fbs file.
