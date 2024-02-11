@@ -1,6 +1,6 @@
 # GraniteTextureReader
 
-Texture Reader/extractor Tool for [Granite SDK](https://unity.com/products/granite-sdk) files (.gts/.gtp). This tool was primarly made with Granblue Fantasy: Relink in mind.
+Texture Reader/Extractor for [Granite SDK](https://unity.com/products/granite-sdk) files (.gts/.gtp). This tool was primarly made with Granblue Fantasy: Relink in mind.
 
 > [!IMPORTANT]  
 > Only version 6 `.gts` files are currently supported. (Version can be viewed at 0x04 in the .gts files)
