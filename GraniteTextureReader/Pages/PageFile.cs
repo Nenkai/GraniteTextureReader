@@ -77,9 +77,9 @@ public class PageFile : IDisposable
         if (codec == 0)
         {
             if (size == 0x02)
-                colorBuffer[0] = new ColorRgba32(compressed[0], compressed[1], 0, 0xFF);
+                colorBuffer.AsSpan().Fill(new ColorRgba32(compressed[0], compressed[1], 0, 0xFF));
             else if (size == 0x04)
-                colorBuffer[0] = new ColorRgba32(compressed[0], compressed[1], compressed[2], compressed[3]);
+                colorBuffer.AsSpan().Fill(new ColorRgba32(compressed[0], compressed[1], compressed[2], compressed[3]));
             else
                 throw new NotSupportedException();
         }

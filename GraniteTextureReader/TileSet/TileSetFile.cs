@@ -29,6 +29,7 @@ public class TileSetFile
     public List<LayerInfo> LayerInfos { get; set; } = [];
     public List<LevelInfo> LevelInfos { get; set; } = [];
     public Dictionary<uint, ParameterBlockInfo> ParameterBlockInfos { get; set; } = [];
+    public PackedTileInfo[] PackedTileInfos { get; set; }
 
     // Graphine::Granite::Internal::TiledFile::Initialize
     public void Initialize(string file)
@@ -88,6 +89,7 @@ public class TileSetFile
         ReadFlatTileInfo(bs, numFlatTiles, flatTilesOffset);
         ReadPageInfos(bs, pagesFilesOffset);
         ReadParameterBlock(bs, numParameterBlock, parameterBlocksOffset);
+        ReadPackedTileInfos(bs, numReverseTiles, reverseTilesOffset);
     }
 
     public string GetProjectFile()
@@ -186,6 +188,16 @@ public class TileSetFile
             var parameterBlockInfo = new ParameterBlockInfo();
             parameterBlockInfo.Read(bs, Version);
             ParameterBlockInfos.Add(parameterBlockInfo.ID, parameterBlockInfo);
+        }
+    }
+
+    private void ReadPackedTileInfos(BinaryStream bs, uint count, ulong offset)
+    {
+        PackedTileInfos = new PackedTileInfo[count];
+        bs.Position = (long)offset;
+        for (int i = 0; i < count; i++)
+        {
+            PackedTileInfos[i] = new PackedTileInfo(bs.ReadUInt32());
         }
     }
 }
