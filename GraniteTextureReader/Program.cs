@@ -6,7 +6,7 @@ namespace GraniteTextureReader;
 
 internal class Program
 {
-    public const string Version = "1.0.0";
+    public const string Version = "1.0.1";
     
     //======================
     //Main Program
