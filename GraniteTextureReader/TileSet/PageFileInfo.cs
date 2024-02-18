@@ -32,6 +32,22 @@ public class PageFileInfo
         }
     }
 
+    public void Write(BinaryStream bs, uint version)
+    {
+        long offs = bs.Position;
+        bs.WriteString(FileName, StringCoding.Raw, Encoding.Unicode);
+        bs.Position = offs + 0x200;
+        bs.WriteUInt32(NumPages);
+        bs.WriteBytes(Checksum);
+        bs.WriteUInt32(Type);
+
+        if (version >= 6)
+        {
+            bs.WriteUInt32(SizeInBytes);
+            bs.WriteUInt32(0);
+        }
+    }
+
     public static uint GetSize(uint version)
     {
         if (version == 5)

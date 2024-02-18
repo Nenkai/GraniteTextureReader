@@ -86,10 +86,10 @@ public class GDEXItem
                 _value = bs.ReadString(StringCoding.ZeroTerminated, encoding: Encoding.Unicode);
                 break;
             case GDEXItemType.Int32:
-                _value = bs.ReadInt16();
+                _value = bs.ReadInt32();
                 break;
             case GDEXItemType.IntArray:
-                _value = bs.ReadInt16s((int)(itemSize / 4));
+                _value = bs.ReadInt32s((int)(itemSize / 4));
                 break;
             case GDEXItemType.GUIDArray:
                 {
@@ -107,12 +107,81 @@ public class GDEXItem
         bs.Align(0x04, grow: true);
     }
 
-    public short GetShort()
+    public void Write(BinaryStream bs)
+    {
+        bs.WriteUInt32(Tag);
+        bs.WriteByte((byte)Type);
+        bs.WriteByte((byte)Flags);
+
+        long offsetToDataSize = bs.Position;
+        if (Flags.HasFlag(GDEXItemFlags.ExtendedHeader))
+            bs.Position += 0x06;
+        else
+            bs.Position += 0x02;
+
+        long baseDataPos = bs.Position;
+        switch (Type)
+        {
+            case GDEXItemType.Struct:
+                {
+                    var items = _value as List<GDEXItem>;
+                    foreach (var item in items)
+                        item.Write(bs);
+                }
+                break;
+            case GDEXItemType.String:
+                bs.WriteString(_value as string, StringCoding.ZeroTerminated, Encoding.Unicode);
+                break;
+            case GDEXItemType.Int32:
+                bs.WriteInt32((int)_value);
+                break;
+            case GDEXItemType.IntArray:
+                {
+                    var items = _value as int[];
+                    foreach (var item in items)
+                        bs.WriteInt32(item);
+                }
+                break;
+            case GDEXItemType.GUIDArray:
+                {
+                    var items = _value as List<Guid>;
+                    foreach (var item in items)
+                        bs.WriteBytes(item.ToByteArray());
+                }
+                break;
+            default:
+                throw new NotSupportedException();
+        }
+        long endDataPos = bs.Position;
+
+        bs.Position = offsetToDataSize;
+        long itemSize = endDataPos - baseDataPos;
+        if (Flags.HasFlag(GDEXItemFlags.ExtendedHeader))
+        {
+            bs.WriteUInt32((uint)(itemSize & 0xFFFFFFFF));
+            bs.WriteUInt16((ushort)(itemSize >> 32));
+        }
+        else
+            bs.WriteUInt16((ushort)itemSize);
+
+        bs.Position = endDataPos;
+        bs.Align(0x04, grow: true);
+    }
+
+    public int GetInt()
     {
         if (Type != GDEXItemType.Int32)
-            throw new Exception("Item is not short type.");
+            throw new Exception("Item is not int type.");
 
-        return (short)_value;
+        return (int)_value;
+    }
+
+    public void SetInt(int value)
+    {
+        if (Type != GDEXItemType.Int32)
+            throw new Exception("Item is not int type.");
+
+        _value = value;
     }
 
     public string GetString()

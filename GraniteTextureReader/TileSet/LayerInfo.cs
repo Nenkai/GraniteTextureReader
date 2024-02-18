@@ -23,6 +23,12 @@ public class LayerInfo
         DefaultColor = bs.ReadUInt32();
     }
 
+    public void Write(BinaryStream bs)
+    {
+        bs.WriteUInt32((uint)DataType);
+        bs.WriteUInt32(DefaultColor);
+    }
+
     public static uint GetSize(uint version)
     {
         if (version < 4 || version > 6)

@@ -24,6 +24,15 @@ public class FlatTileInfo
         TileListOffset = bs.ReadUInt32();
     }
 
+    public void Write(BinaryStream bs)
+    {
+        bs.WriteUInt16(PageFileIndex);
+        bs.WriteUInt16(pageIndex);
+        bs.WriteUInt16(TileIndex);
+        bs.WriteUInt16(NumTiles);
+        bs.WriteUInt32(TileListOffset);
+    }
+
     public static uint GetSize()
     {
         return 0x0C;

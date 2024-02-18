@@ -23,8 +23,8 @@ public class LevelInfo
         bs.Position = tilesOffset;
         for (int i = 0; i < TileInfos.Length; i++)
             TileInfos[i] = new TileInfo(bs.ReadInt32());
-        
     }
+
 
     public static uint GetSize(uint version)
     {

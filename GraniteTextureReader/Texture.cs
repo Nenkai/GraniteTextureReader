@@ -10,19 +10,19 @@ namespace GraniteTextureReader;
 public class TextureDescriptor
 {
     public string Name { get; set; }
-    public ushort Width { get; set; }
-    public ushort Height { get; set; }
-    public ushort X { get; set; }
-    public ushort Y { get; set; }
+    public uint Width { get; set; }
+    public uint Height { get; set; }
+    public uint X { get; set; }
+    public uint Y { get; set; }
 
     public static TextureDescriptor FromGDEXItem(GDEXItem item)
     {
         var texture = new TextureDescriptor();
         texture.Name = item[GDEXTags.Name].GetString();
-        texture.Width = (ushort)item[GDEXTags.Width].GetShort();
-        texture.Height = (ushort)item[GDEXTags.Height].GetShort();
-        texture.X = (ushort)item[GDEXTags.X].GetShort();
-        texture.Y = (ushort)item[GDEXTags.Y].GetShort();
+        texture.Width = (uint)item[GDEXTags.Width].GetInt();
+        texture.Height = (uint)item[GDEXTags.Height].GetInt();
+        texture.X = (uint)item[GDEXTags.X].GetInt();
+        texture.Y = (uint)item[GDEXTags.Y].GetInt();
         return texture;
     }
 }

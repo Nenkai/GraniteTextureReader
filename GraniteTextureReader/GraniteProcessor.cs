@@ -58,7 +58,7 @@ public class GraniteProcessor : IDisposable
             if (layer > -1)
             {
                 string realName = string.Empty;
-                ushort w = texture.Width, h = texture.Height;
+                ushort w = (ushort)texture.Width, h = (ushort)texture.Height;
                 uint tileStepX = 1, tileStepY = 1;
                 if (project is not null)
                 {
@@ -67,14 +67,15 @@ public class GraniteProcessor : IDisposable
                     ProjectAssetLayerTexturesTexture textureLayerAsset = layerAsset.Textures.Texture;
                     realName = Path.GetFileName(textureLayerAsset.Src);
 
+
                     // Page file width and height can differ from texture. It's odd.
                     // Files that do this also have tiles with their id value having the upper bit set
                     w = textureLayerAsset.Width;
                     h = textureLayerAsset.Height;
 
                     // Required when texture is smaller than declared in the page file
-                    tileStepX = (uint)texture.Width / textureLayerAsset.Width;
-                    tileStepY = (uint)texture.Height / textureLayerAsset.Height;
+                    tileStepX = texture.Width / textureLayerAsset.Width;
+                    tileStepY = texture.Height / textureLayerAsset.Height;
                 }
 
                 Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layer})");
@@ -87,7 +88,7 @@ public class GraniteProcessor : IDisposable
                 for (int layerNum = 0; layerNum < 4; layerNum++)
                 {
                     string realName = string.Empty;
-                    ushort w = texture.Width, h = texture.Height;
+                    ushort w = (ushort)texture.Width, h = (ushort)texture.Height;
                     uint tileStepX = 1, tileStepY = 1;
                     if (project is not null)
                     {
@@ -101,8 +102,8 @@ public class GraniteProcessor : IDisposable
 
                         w = textureLayerAsset.Width;
                         h = textureLayerAsset.Height;
-                        tileStepX = (uint)texture.Width / textureLayerAsset.Width;
-                        tileStepY = (uint)texture.Height / textureLayerAsset.Height;
+                        tileStepX = texture.Width / textureLayerAsset.Width;
+                        tileStepY = texture.Height / textureLayerAsset.Height;
                     }
 
                     string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layerNum}" : realName;
@@ -114,7 +115,7 @@ public class GraniteProcessor : IDisposable
         }
     }
 
-    public void ExtractTexture(string outputPath, ushort xOffset, ushort yOffset, ushort textureWidth, ushort textureHeight, uint tileStepX, uint tileStepY, int level, int layer)
+    public void ExtractTexture(string outputPath, uint xOffset, uint yOffset, ushort textureWidth, ushort textureHeight, uint tileStepX, uint tileStepY, int level, int layer)
     {
         uint tileWidthNoBorder = TileSet.TileWidth - (2 * TileSet.TileBorder);
         uint tileHeightNoBorder = TileSet.TileHeight - (2 * TileSet.TileBorder);
@@ -128,7 +129,8 @@ public class GraniteProcessor : IDisposable
         Rgba32[] texturePixels = ArrayPool<Rgba32>.Shared.Rent(textureWidth * textureHeight);
 
         // Layers explicitly can set a default image color.
-        texturePixels.AsSpan().Fill(new Rgba32(TileSet.LayerInfos[layer].DefaultColor));
+        LayerInfo layerInfo = TileSet.LayerInfos[layer];
+        texturePixels.AsSpan().Fill(new Rgba32(layerInfo.DefaultColor));
 
         for (uint currentTileY = 0; currentTileY < numYTiles; currentTileY++)
         {
@@ -139,18 +141,31 @@ public class GraniteProcessor : IDisposable
                 uint tX = (currentTileX * tileStepX) + texTileOfsX;
                 uint tY = (currentTileY * tileStepY) + texTileOfsY;
                 TileInfo tileInfo = levelInfo.TileInfos[layer + TileSet.LayerInfos.Count * (tY * levelInfo.NumTilesX + tX)];
+                if ((tileInfo.FlatTileIndex >> 31) != 0)
+                {
+                    // This bit means the current level has no data to be used and a lower level should be used.
+                    // TODO: Actually use lower level rather than use tile stepping.
+                }
 
                 int outputX = (int)(currentTileX * tileWidthNoBorder);
                 int outputY = (int)(currentTileY * tileHeightNoBorder);
 
                 ColorRgba32[] tilePixels = GetFlatTileData(tileInfo.FlatTileIndex);
-                Span<Rgba32> tilePixelsRgba = MemoryMarshal.Cast<ColorRgba32, Rgba32>(tilePixels);
+                if (layerInfo.DataType == DataType.X8Y8Z0_TANGENT) // Normal maps, b and a is ignored
+                {
+                    for (int i = 0; i < tilePixels.Length; i++)
+                    {
+                        tilePixels[i].b = (byte)((layerInfo.DefaultColor >> 16) & 0xFF);
+                        tilePixels[i].a = (byte)((layerInfo.DefaultColor >> 24) & 0xFF);
+                    }
+                }
 
+                Span<Rgba32> tilePixelsRgba = MemoryMarshal.Cast<ColorRgba32, Rgba32>(tilePixels);
                 // Copy each row to the output, faster than doing it per-pixel
                 for (int yRow = 0; yRow < tileHeightNoBorder; yRow++)
                 {
                     Span<Rgba32> rowPixels = tilePixelsRgba.Slice((int)(((yRow + TileSet.TileBorder) * TileSet.TileWidth) + TileSet.TileBorder), (int)tileWidthNoBorder);
-                    Span<Rgba32> outputRow = texturePixels.AsSpan((outputY * textureWidth) + (yRow * textureHeight) + outputX, (int)tileWidthNoBorder);
+                    Span<Rgba32> outputRow = texturePixels.AsSpan((outputY * textureWidth) + (yRow * textureWidth) + outputX, (int)tileWidthNoBorder);
                     rowPixels.CopyTo(outputRow);
                 }
             }
