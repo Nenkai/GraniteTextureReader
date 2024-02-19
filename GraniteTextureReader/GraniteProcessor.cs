@@ -13,7 +13,7 @@ using BCnEncoder.Shared;
 
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-
+using SixLabors.ImageSharp.Processing;
 using GraniteTextureReader.GDEX;
 using GraniteTextureReader.TileSet;
 using GraniteTextureReader.Pages;
@@ -172,6 +172,7 @@ public class GraniteProcessor : IDisposable
         }
 
         Image<Rgba32> image = Image.LoadPixelData<Rgba32>(texturePixels, textureWidth, textureHeight);
+        image.Mutate(e => e.Flip(FlipMode.Vertical));
         image.SaveAsTga(_dir + "\\_extracted\\" + outputPath);
         ArrayPool<Rgba32>.Shared.Return(texturePixels);
     }
