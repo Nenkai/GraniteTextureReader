@@ -32,6 +32,8 @@ public class TileSetFile
     public Dictionary<uint, ParameterBlockInfo> ParameterBlockInfos { get; set; } = [];
     public PackedTileInfo[] PackedTileInfos { get; set; }
 
+    private Project _projectCache;
+
     // Graphine::Granite::Internal::TiledFile::Initialize
     public void Initialize(string file)
     {
@@ -105,13 +107,19 @@ public class TileSetFile
 
     public Project GetProject()
     {
+        if (_projectCache is not null)
+            return _projectCache;
+
         string projFile = GetProjectFile();
         if (!string.IsNullOrEmpty(projFile))
         {
             XmlSerializer serializer = new XmlSerializer(typeof(Project));
-            Project project;
-            using (TextReader reader = new StringReader(projFile))
-                return (Project)serializer.Deserialize(reader);
+
+            using TextReader reader = new StringReader(projFile);
+            Project project = (Project)serializer.Deserialize(reader);
+            _projectCache ??= project;
+
+            return project;
         }
 
         return null;

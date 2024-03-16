@@ -43,7 +43,13 @@ public class GraniteProcessor : IDisposable
         TileSet.Initialize(fs);
     }
 
-    public void Extract(int layer, string textureName = "")
+    public void Read(string pageFilesDir, TileSetFile tileSet)
+    {
+        _dir = pageFilesDir;
+        TileSet = tileSet;
+    }
+
+    public void Extract(int layer, string textureName = "", string outputDir = "")
     {
         var textures = TileSet.GetTextures();
 
@@ -82,8 +88,9 @@ public class GraniteProcessor : IDisposable
 
                 Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layer})");
                 string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layer}.tga" : realName;
-                
-                ExtractTexture(Path.ChangeExtension(outputName, ".tga"), texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layer); // TODO: Preserve file type? .dds, tga, etc
+                string outputPath = Path.Combine(outputDir, outputName);
+
+                ExtractTexture(Path.ChangeExtension(outputPath, ".tga"), texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layer); // TODO: Preserve file type? .dds, tga, etc
             }
             else
             {
@@ -108,10 +115,11 @@ public class GraniteProcessor : IDisposable
                         tileStepY = texture.Height / textureLayerAsset.Height;
                     }
 
+                    Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layerNum})");
                     string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layerNum}" : realName;
+                    string outputPath = Path.Combine(outputDir, outputName);
 
-                    Console.WriteLine($"[{i+1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layerNum})");
-                    ExtractTexture(Path.ChangeExtension(outputName, ".tga"), texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layerNum);
+                    ExtractTexture(Path.ChangeExtension(outputPath, ".tga"), texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layerNum);
                 }
             }
         }
@@ -175,7 +183,7 @@ public class GraniteProcessor : IDisposable
 
         Image<Rgba32> image = Image.LoadPixelData<Rgba32>(texturePixels, textureWidth, textureHeight);
         image.Mutate(e => e.Flip(FlipMode.Vertical));
-        image.SaveAsTga(_dir + "\\_extracted\\" + outputPath, new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32 });
+        image.SaveAsTga(outputPath, new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32 });
         ArrayPool<Rgba32>.Shared.Return(texturePixels);
     }
 
