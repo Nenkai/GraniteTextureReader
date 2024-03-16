@@ -7,7 +7,7 @@ namespace GraniteTextureReader;
 
 internal class Program
 {
-    public const string Version = "1.1.2";
+    public const string Version = "1.1.3";
     
     //======================
     //Main Program
@@ -35,7 +35,7 @@ internal class Program
     //Methods
     //======================
 
-    public static void Extract(string tileSetPath, int layer, string textureName = "")
+    public static void Extract(string tileSetPath, int layer, string textureName = "", string outputDir = "")
     {
         if (!File.Exists(tileSetPath))
         {
@@ -46,8 +46,13 @@ internal class Program
         var graniteProcessor = new GraniteProcessor();
         try
         {
+            if (string.IsNullOrEmpty(outputDir))
+                outputDir = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tileSetPath)), "_extracted");
+
+            Directory.CreateDirectory(outputDir);
+
             graniteProcessor.Read(tileSetPath);
-            graniteProcessor.Extract(layer, textureName);
+            graniteProcessor.Extract(layer, textureName, outputDir);
 
             Console.WriteLine($"Done. Files can be found in the \"_extracted\" folder next to {tileSetPath}");
         }
@@ -60,7 +65,7 @@ internal class Program
 
     public static void ExtractSpecific(ExtractVerbs verbs)
     {
-        Extract(verbs.TileSetPath, verbs.LayerToExtract, verbs.FileToExtract);
+        Extract(verbs.TileSetPath, verbs.LayerToExtract, verbs.FileToExtract, string.Empty);
     }
 
     public static void ExtractAll(ExtractAllVerbs verbs)
@@ -75,7 +80,8 @@ internal class Program
             Console.WriteLine("Aborted.");
             return;
         }
-        Extract(verbs.TileSetPath, verbs.LayerToExtract);
+
+        Extract(verbs.TileSetPath, verbs.LayerToExtract, outputDir: verbs.OutputDir);
     }
 
     public static void ExtractProjectFile(ExtractProjectFileVerbs verbs)
@@ -229,6 +235,12 @@ internal class Program
             HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.", 
             Default = (int)0)]
         public int LayerToExtract { get; set; }
+
+        [Option(
+            'o', "output",
+            Required = false,
+            HelpText = "Output directory. Defaults to '_extracted' folder next to .gts file.")]
+        public string OutputDir { get; set; }
 
         // [Option('f', "filter", Required = false, HelpText = "Filter. Only paths starting with the specified filter will be extracted.")]
         // public string Filter { get; set; }

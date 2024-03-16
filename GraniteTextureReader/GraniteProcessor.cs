@@ -33,10 +33,6 @@ public class GraniteProcessor : IDisposable
         Configuration.Default.PreferContiguousImageBuffers = true;
 
         _dir = Path.GetDirectoryName(Path.GetFullPath(tileSetFile));
-        // Console.WriteLine($"_dir {_dir}");
-        string outputPath = _dir + "\\_extracted";
-        // Console.WriteLine($"outputPath {outputPath}");
-        Directory.CreateDirectory(outputPath);
 
         using var fs = File.OpenRead(tileSetFile);
         TileSet = new TileSetFile();
@@ -60,7 +56,7 @@ public class GraniteProcessor : IDisposable
             GDEXItem? textureItem = textures[i];
 
             TextureDescriptor texture = TextureDescriptor.FromGDEXItem(textureItem);
-            if (!string.IsNullOrEmpty(textureName) && texture.Name != textureName) 
+            if (!string.IsNullOrEmpty(textureName) && texture.Name != textureName)
                 continue;
 
             if (layer > -1)
@@ -114,7 +110,6 @@ public class GraniteProcessor : IDisposable
                         tileStepX = texture.Width / textureLayerAsset.Width;
                         tileStepY = texture.Height / textureLayerAsset.Height;
                     }
-
                     Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layerNum})");
                     string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layerNum}" : realName;
                     string outputPath = Path.Combine(outputDir, outputName);
@@ -130,11 +125,14 @@ public class GraniteProcessor : IDisposable
         uint tileWidthNoBorder = TileSet.TileWidth - (2 * TileSet.TileBorder);
         uint tileHeightNoBorder = TileSet.TileHeight - (2 * TileSet.TileBorder);
 
-        uint numXTiles = (textureWidth / tileWidthNoBorder);
-        uint numYTiles = (textureHeight / tileHeightNoBorder);
+        uint numXTiles = (uint)MathF.Round((float)textureWidth / tileWidthNoBorder, MidpointRounding.ToPositiveInfinity);
+        uint numYTiles = (uint)MathF.Round((float)textureHeight / tileHeightNoBorder, MidpointRounding.ToPositiveInfinity);
 
         uint texTileOfsX = xOffset / tileWidthNoBorder;
         uint texTileOfsY = yOffset / tileHeightNoBorder;
+
+        int maxTilePixOutputX = (int)Math.Min(textureWidth, tileWidthNoBorder);
+        int maxTilePixOutputY = (int)Math.Min(textureHeight, tileHeightNoBorder);
 
         Rgba32[] texturePixels = ArrayPool<Rgba32>.Shared.Rent(textureWidth * textureHeight);
 
@@ -172,10 +170,10 @@ public class GraniteProcessor : IDisposable
 
                 Span<Rgba32> tilePixelsRgba = MemoryMarshal.Cast<ColorRgba32, Rgba32>(tilePixels);
                 // Copy each row to the output, faster than doing it per-pixel
-                for (int yRow = 0; yRow < tileHeightNoBorder; yRow++)
+                for (int yRow = 0; yRow < maxTilePixOutputY; yRow++)
                 {
-                    Span<Rgba32> rowPixels = tilePixelsRgba.Slice((int)(((yRow + TileSet.TileBorder) * TileSet.TileWidth) + TileSet.TileBorder), (int)tileWidthNoBorder);
-                    Span<Rgba32> outputRow = texturePixels.AsSpan((outputY * textureWidth) + (yRow * textureWidth) + outputX, (int)tileWidthNoBorder);
+                    Span<Rgba32> rowPixels = tilePixelsRgba.Slice((int)(((yRow + TileSet.TileBorder) * TileSet.TileWidth) + TileSet.TileBorder), maxTilePixOutputX);
+                    Span<Rgba32> outputRow = texturePixels.AsSpan((outputY * textureWidth) + (yRow * textureWidth) + outputX, maxTilePixOutputX);
                     rowPixels.CopyTo(outputRow);
                 }
             }

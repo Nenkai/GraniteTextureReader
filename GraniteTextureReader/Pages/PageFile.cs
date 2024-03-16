@@ -70,7 +70,9 @@ public class PageFile : IDisposable
             throw new InvalidDataException($"Parameter block info missing? Page: {pageIndex}, Tile: {tileIndex}");
 
         byte[] compressed = _stream.ReadBytes((int)size);
-        byte[] output = ArrayPool<byte>.Shared.Rent((int)_tileSet.MaxTileSize);
+
+        // Turns out tile max size is unreliable (gbfr relink 1.1.1 - 5.gts) so just use 0x10000 instead
+        byte[] output = ArrayPool<byte>.Shared.Rent(/* (int)_tileSet.MaxTileSize */ 0x10000); 
 
         ColorRgba32[] colorBuffer = new ColorRgba32[_tileSet.TileWidth * _tileSet.TileHeight];
         long read = 0;
@@ -108,7 +110,7 @@ public class PageFile : IDisposable
                 //</Configuration >
 
                 // high compression will be lz4, lz40.1.0
-                read = FastLZ.Decompress(compressed, size, output, output.Length);
+                read = FastLZ.Decompress(compressed, size, output, 0x10000);
             }
             else
                 throw new NotSupportedException($"Codec {codec} not supported");
