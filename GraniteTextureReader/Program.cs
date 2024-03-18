@@ -7,8 +7,8 @@ namespace GraniteTextureReader;
 
 internal class Program
 {
-    public const string Version = "1.1.3";
-    
+    public const string Version = "1.1.2";
+
     //======================
     //Main Program
     //======================
@@ -23,7 +23,7 @@ internal class Program
         Console.WriteLine("---------------------------------------------");
 
         var p = Parser.Default.ParseArguments<ExtractVerbs, ExtractAllVerbs, ExtractProjectFileVerbs, DowngradeVerbs>(args);
-    
+
         p.WithParsed<ExtractVerbs>(ExtractSpecific)
         .WithParsed<ExtractAllVerbs>(ExtractAll)
         .WithParsed<ExtractProjectFileVerbs>(ExtractProjectFile)
@@ -35,37 +35,31 @@ internal class Program
     //Methods
     //======================
 
-    public static void Extract(string tileSetPath, int layer, string textureName = "", string outputDir = "")
+    public static void ExtractSpecific(ExtractVerbs verbs)
     {
-        if (!File.Exists(tileSetPath))
+        if (!File.Exists(verbs.TileSetPath))
         {
-            Console.WriteLine($"ERROR: Tile set file '{tileSetPath}' does not exist.");
+            Console.WriteLine($"ERROR: Tile set file '{verbs.TileSetPath}' does not exist.");
             return;
         }
 
-        var graniteProcessor = new GraniteProcessor();
         try
         {
-            if (string.IsNullOrEmpty(outputDir))
-                outputDir = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tileSetPath)), "_extracted");
+            if (string.IsNullOrEmpty(verbs.OutputDir))
+                verbs.OutputDir = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(verbs.TileSetPath)), "_extracted");
 
-            Directory.CreateDirectory(outputDir);
+            Directory.CreateDirectory(verbs.OutputDir);
 
-            graniteProcessor.Read(tileSetPath);
-            graniteProcessor.Extract(layer, textureName, outputDir);
+            var graniteProcessor = GraniteProcessor.CreateFromTileSet(verbs.TileSetPath);
+            graniteProcessor.Extract(verbs.LayerToExtract, verbs.FileToExtract, verbs.OutputDir);
 
-            Console.WriteLine($"Done. Files can be found in the \"_extracted\" folder next to {tileSetPath}");
+            Console.WriteLine($"Done. Files can be found in the \"_extracted\" folder next to {verbs.TileSetPath}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ERROR: Failed to extract from {tileSetPath} - {ex.Message}");
+            Console.WriteLine($"ERROR: Failed to extract from {verbs.TileSetPath} - {ex.Message}");
             return;
         }
-    }
-
-    public static void ExtractSpecific(ExtractVerbs verbs)
-    {
-        Extract(verbs.TileSetPath, verbs.LayerToExtract, verbs.FileToExtract, string.Empty);
     }
 
     public static void ExtractAll(ExtractAllVerbs verbs)
@@ -81,7 +75,24 @@ internal class Program
             return;
         }
 
-        Extract(verbs.TileSetPath, verbs.LayerToExtract, outputDir: verbs.OutputDir);
+        if (!File.Exists(verbs.TileSetPath))
+        {
+            Console.WriteLine($"ERROR: Tile set file '{verbs.TileSetPath}' does not exist.");
+            return;
+        }
+
+        try
+        {
+            var graniteProcessor = GraniteProcessor.CreateFromTileSet(verbs.TileSetPath);
+            graniteProcessor.ExtractAll(verbs.LayerToExtract, verbs.OutputDir);
+
+            Console.WriteLine($"Done. Files can be found in the \"_extracted\" folder next to {verbs.TileSetPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: Failed to extract from {verbs.TileSetPath} - {ex.Message}");
+            return;
+        }
     }
 
     public static void ExtractProjectFile(ExtractProjectFileVerbs verbs)
@@ -201,38 +212,45 @@ internal class Program
     public class ExtractVerbs
     {
         [Option(
-            't', "tileset", 
-            Required = true, 
+            't', "tileset",
+            Required = true,
             HelpText = "Input .gts file. NOTE: Only version 6 is supported.")]
         public string TileSetPath { get; set; }
 
         [Option(
-            'f', "file", 
-            Required = true, 
+            'f', "file",
+            Required = true,
             HelpText = ".gtp texture file name from the tile set to extract.")]
         public string FileToExtract { get; set; }
 
         [Option(
-            'l', "layer(s)", 
-            Required = false, 
-            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.", 
+            'l', "layer(s)",
+            Required = false,
+            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.",
             Default = (int)0)]
         public int LayerToExtract { get; set; }
+
+
+        [Option(
+            'o', "output",
+            Required = false,
+            HelpText = "Output directory. Defaults to '_extracted' folder next to .gts file.")]
+        public string OutputDir { get; set; }
     }
 
     [Verb("extract-all", HelpText = "Extract all texture files from a .gts Tile Set file.")]
     public class ExtractAllVerbs
     {
         [Option(
-            't', "tileset", 
-            Required = true, 
+            't', "tileset",
+            Required = true,
             HelpText = "Input .gts file. NOTE: Only version 6 is supported.")]
         public string TileSetPath { get; set; }
 
         [Option(
-            'l', "layer(s)", 
-            Required = false, 
-            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.", 
+            'l', "layer(s)",
+            Required = false,
+            HelpText = "Which texture layers to extract (-1 = All, 0 = Albedo, 1 = Normal, 2 = RGB Mask 1, 3 = RGB Mask 2). Defaults to 0.",
             Default = (int)0)]
         public int LayerToExtract { get; set; }
 

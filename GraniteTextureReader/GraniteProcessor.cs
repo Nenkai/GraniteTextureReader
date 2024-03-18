@@ -28,15 +28,22 @@ public class GraniteProcessor : IDisposable
     public Dictionary<int, PageFile> PageFiles { get; set; } = [];
     private string _dir;
 
-    public void Read(string tileSetFile)
+    public GraniteProcessor(string pageFilesDir, TileSetFile tileSet)
     {
         Configuration.Default.PreferContiguousImageBuffers = true;
 
-        _dir = Path.GetDirectoryName(Path.GetFullPath(tileSetFile));
+        _dir = pageFilesDir;
+        TileSet = tileSet;
+    }
+
+    public static GraniteProcessor CreateFromTileSet(string tileSetFile)
+    {
+        string dir = Path.GetDirectoryName(Path.GetFullPath(tileSetFile));
 
         using var fs = File.OpenRead(tileSetFile);
-        TileSet = new TileSetFile();
-        TileSet.Initialize(fs);
+        var tileSet = new TileSetFile();
+        tileSet.Initialize(fs);
+        return new GraniteProcessor(dir, tileSet);
     }
 
     public void Read(string pageFilesDir, TileSetFile tileSet)
@@ -45,77 +52,90 @@ public class GraniteProcessor : IDisposable
         TileSet = tileSet;
     }
 
-    public void Extract(int layer, string textureName = "", string outputDir = "")
+    public void ExtractAll(int layer, string outputDir, string outputFileName = "")
     {
         var textures = TileSet.GetTextures();
-
-        Project project = TileSet.GetProject();
 
         for (int i = 0; i < textures.Count; i++)
         {
             GDEXItem? textureItem = textures[i];
 
             TextureDescriptor texture = TextureDescriptor.FromGDEXItem(textureItem);
-            if (!string.IsNullOrEmpty(textureName) && texture.Name != textureName)
+            Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {texture.Name} ({texture.Width}x{texture.Height}, layer {layer})");
+            ExtractSingle(layer, texture, outputDir, outputFileName);
+        }
+    }
+
+    public void Extract(int layer, string pageFileName, string outputDir, string outputFileName = "")
+    {
+        var textures = TileSet.GetTextures();
+        for (int i = 0; i < textures.Count; i++)
+        {
+            GDEXItem? textureItem = textures[i];
+
+            TextureDescriptor texture = TextureDescriptor.FromGDEXItem(textureItem);
+            if (texture.Name != pageFileName)
                 continue;
 
-            if (layer > -1)
+            ExtractSingle(layer, texture, outputDir, outputFileName);
+        }
+    }
+
+    private void ExtractSingle(int layer, TextureDescriptor texture, string outputDir, string outputFileName)
+    {
+        Project project = TileSet.GetProject();
+
+        if (layer > -1)
+        {
+            ushort w = (ushort)texture.Width, h = (ushort)texture.Height;
+            uint tileStepX = 1, tileStepY = 1;
+            if (project is not null)
             {
-                string realName = string.Empty;
+
+                ProjectAsset asset = project.ImportedAssets.FirstOrDefault(e => e.Name == texture.Name);
+                ProjectAssetLayer layerAsset = asset.Layers[layer];
+                ProjectAssetLayerTexturesTexture textureLayerAsset = layerAsset.Textures.Texture;
+                if (string.IsNullOrEmpty(outputFileName))
+                    outputFileName = Path.ChangeExtension(Path.GetFileName(textureLayerAsset.Src), ".tga");
+
+                // Page file width and height can differ from texture. It's odd.
+                // Files that do this also have tiles with their id value having the upper bit set
+                w = textureLayerAsset.Width;
+                h = textureLayerAsset.Height;
+
+                // Required when texture is smaller than declared in the page file
+                tileStepX = texture.Width / textureLayerAsset.Width;
+                tileStepY = texture.Height / textureLayerAsset.Height;
+            }
+
+            ExtractTexture(Path.Combine(outputDir, outputFileName),
+                texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layer);
+        }
+        else
+        {
+            for (int layerNum = 0; layerNum < 4; layerNum++)
+            {
                 ushort w = (ushort)texture.Width, h = (ushort)texture.Height;
                 uint tileStepX = 1, tileStepY = 1;
                 if (project is not null)
                 {
                     ProjectAsset asset = project.ImportedAssets.FirstOrDefault(e => e.Name == texture.Name);
-                    ProjectAssetLayer layerAsset = asset.Layers[layer];
+                    if (layerNum >= asset.Layers.Length)
+                        continue;
+
+                    ProjectAssetLayer layerAsset = asset.Layers[layerNum];
                     ProjectAssetLayerTexturesTexture textureLayerAsset = layerAsset.Textures.Texture;
-                    realName = Path.GetFileName(textureLayerAsset.Src);
+                    if (string.IsNullOrEmpty(outputFileName))
+                        outputFileName = Path.ChangeExtension(Path.GetFileName(textureLayerAsset.Src), ".tga");
 
-
-                    // Page file width and height can differ from texture. It's odd.
-                    // Files that do this also have tiles with their id value having the upper bit set
                     w = textureLayerAsset.Width;
                     h = textureLayerAsset.Height;
-
-                    // Required when texture is smaller than declared in the page file
                     tileStepX = texture.Width / textureLayerAsset.Width;
                     tileStepY = texture.Height / textureLayerAsset.Height;
                 }
 
-                Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layer})");
-                string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layer}.tga" : realName;
-                string outputPath = Path.Combine(outputDir, outputName);
-
-                ExtractTexture(Path.ChangeExtension(outputPath, ".tga"), texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layer); // TODO: Preserve file type? .dds, tga, etc
-            }
-            else
-            {
-                for (int layerNum = 0; layerNum < 4; layerNum++)
-                {
-                    string realName = string.Empty;
-                    ushort w = (ushort)texture.Width, h = (ushort)texture.Height;
-                    uint tileStepX = 1, tileStepY = 1;
-                    if (project is not null)
-                    {
-                        ProjectAsset asset = project.ImportedAssets[i];
-                        if (layerNum >= asset.Layers.Length)
-                            continue;
-
-                        ProjectAssetLayer layerAsset = asset.Layers[layerNum];
-                        ProjectAssetLayerTexturesTexture textureLayerAsset = layerAsset.Textures.Texture;
-                        realName = Path.GetFileName(textureLayerAsset.Src);
-
-                        w = textureLayerAsset.Width;
-                        h = textureLayerAsset.Height;
-                        tileStepX = texture.Width / textureLayerAsset.Width;
-                        tileStepY = texture.Height / textureLayerAsset.Height;
-                    }
-                    Console.WriteLine($"[{i + 1}/{textures.Count}] Processing {realName} from {texture.Name} ({texture.Width}x{texture.Height}, layer {layerNum})");
-                    string outputName = string.IsNullOrEmpty(realName) ? texture.Name + $"_{layerNum}" : realName;
-                    string outputPath = Path.Combine(outputDir, outputName);
-
-                    ExtractTexture(Path.ChangeExtension(outputPath, ".tga"), texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layerNum);
-                }
+                ExtractTexture(Path.Combine(outputDir, outputFileName),
+                    texture.X, texture.Y, w, h, tileStepX, tileStepY, 0, layerNum);
             }
         }
     }
@@ -125,14 +145,11 @@ public class GraniteProcessor : IDisposable
         uint tileWidthNoBorder = TileSet.TileWidth - (2 * TileSet.TileBorder);
         uint tileHeightNoBorder = TileSet.TileHeight - (2 * TileSet.TileBorder);
 
-        uint numXTiles = (uint)MathF.Round((float)textureWidth / tileWidthNoBorder, MidpointRounding.ToPositiveInfinity);
-        uint numYTiles = (uint)MathF.Round((float)textureHeight / tileHeightNoBorder, MidpointRounding.ToPositiveInfinity);
+        uint numXTiles = (textureWidth / tileWidthNoBorder);
+        uint numYTiles = (textureHeight / tileHeightNoBorder);
 
         uint texTileOfsX = xOffset / tileWidthNoBorder;
         uint texTileOfsY = yOffset / tileHeightNoBorder;
-
-        int maxTilePixOutputX = (int)Math.Min(textureWidth, tileWidthNoBorder);
-        int maxTilePixOutputY = (int)Math.Min(textureHeight, tileHeightNoBorder);
 
         Rgba32[] texturePixels = ArrayPool<Rgba32>.Shared.Rent(textureWidth * textureHeight);
 
@@ -170,10 +187,10 @@ public class GraniteProcessor : IDisposable
 
                 Span<Rgba32> tilePixelsRgba = MemoryMarshal.Cast<ColorRgba32, Rgba32>(tilePixels);
                 // Copy each row to the output, faster than doing it per-pixel
-                for (int yRow = 0; yRow < maxTilePixOutputY; yRow++)
+                for (int yRow = 0; yRow < tileHeightNoBorder; yRow++)
                 {
-                    Span<Rgba32> rowPixels = tilePixelsRgba.Slice((int)(((yRow + TileSet.TileBorder) * TileSet.TileWidth) + TileSet.TileBorder), maxTilePixOutputX);
-                    Span<Rgba32> outputRow = texturePixels.AsSpan((outputY * textureWidth) + (yRow * textureWidth) + outputX, maxTilePixOutputX);
+                    Span<Rgba32> rowPixels = tilePixelsRgba.Slice((int)(((yRow + TileSet.TileBorder) * TileSet.TileWidth) + TileSet.TileBorder), (int)tileWidthNoBorder);
+                    Span<Rgba32> outputRow = texturePixels.AsSpan((outputY * textureWidth) + (yRow * textureWidth) + outputX, (int)tileWidthNoBorder);
                     rowPixels.CopyTo(outputRow);
                 }
             }
@@ -181,7 +198,12 @@ public class GraniteProcessor : IDisposable
 
         Image<Rgba32> image = Image.LoadPixelData<Rgba32>(texturePixels, textureWidth, textureHeight);
         image.Mutate(e => e.Flip(FlipMode.Vertical));
-        image.SaveAsTga(outputPath, new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32 });
+
+        if (Path.GetExtension(outputPath) == ".tga")
+            image.SaveAsTga(outputPath, new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32 });
+        else
+            image.Save(outputPath);
+
         ArrayPool<Rgba32>.Shared.Return(texturePixels);
     }
 
