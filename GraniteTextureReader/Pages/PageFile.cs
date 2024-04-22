@@ -52,7 +52,7 @@ public class PageFile : IDisposable
             throw new NotSupportedException("Only version 4 is supported.");
     }
 
-    public ColorRgba32[] TranscodeTile(int pageIndex, int tileIndex)
+    public ColorRgba32[] TranscodeTile(int pageIndex, int tileIndex, string textureFormat)
     {
         long startPageOffset = pageIndex * _tileSet.CustomPageSize;
         long pageOffset = pageIndex == 0 ? 0x18 : startPageOffset;
@@ -95,8 +95,7 @@ public class PageFile : IDisposable
             else if (codec == 4)
             {
                 // "QuartzFast?" aka "raw"/"lz4"/"lz40.1.0"?
-                // has a dictionary for decompression
-                throw new NotSupportedException("Quartzfast codec not supported");
+                read = K4os.Compression.LZ4.LZ4Codec.Decode(compressed, output);
             }
             else if (codec == 9)
             {
@@ -115,18 +114,14 @@ public class PageFile : IDisposable
             else
                 throw new NotSupportedException($"Codec {codec} not supported");
 
-            SpanReader sr = new SpanReader(info.ParameterBlock);
-            sr.Position = 44;
-            string textureType = sr.ReadString0();
-
-            CompressionFormat format = textureType switch
+            CompressionFormat format = textureFormat switch
             {
-                "BC7 " => CompressionFormat.Bc7,
+                "BC7" => CompressionFormat.Bc7,
                 // bc6?
-                "BC5 " => CompressionFormat.Bc5,
-                "BC4 " => CompressionFormat.Bc4,
-                "BC3 " => CompressionFormat.Bc3,
-                "BC1 " => CompressionFormat.Bc1,
+                "BC5" => CompressionFormat.Bc5,
+                "BC4" => CompressionFormat.Bc4,
+                "BC3" => CompressionFormat.Bc3,
+                "BC1" => CompressionFormat.Bc1,
             };
 
             var colors = new BcDecoder();

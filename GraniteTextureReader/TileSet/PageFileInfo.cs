@@ -19,8 +19,11 @@ public class PageFileInfo
 
     public void Read(BinaryStream bs, uint version)
     {
-        byte[] fileName = bs.ReadBytes(0x200);
-        FileName = Encoding.Unicode.GetString(fileName).TrimEnd('\0');
+        // Sometimes there's data beyond the file name, todo investigate?
+        long currentPos = bs.Position;
+        FileName = bs.ReadString(StringCoding.ZeroTerminated, Encoding.Unicode);
+        bs.Position = currentPos + 0x200;
+
         NumPages = bs.ReadUInt32();
         Checksum = bs.ReadBytes(0x10);
         Type = bs.ReadUInt32();
