@@ -5,9 +5,9 @@ using CommandLine;
 
 namespace GraniteTextureReader;
 
-internal class Program
+public class Program
 {
-    public const string Version = "1.1.4";
+    public const string Version = "1.1.5";
 
     //======================
     //Main Program

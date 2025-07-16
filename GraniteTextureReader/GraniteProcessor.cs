@@ -7,8 +7,6 @@ using System.Runtime.InteropServices;
 using System.Buffers;
 using System.Xml.Serialization;
 
-using Microsoft.Toolkit.HighPerformance;
-
 using BCnEncoder.Shared;
 
 using SixLabors.ImageSharp;
