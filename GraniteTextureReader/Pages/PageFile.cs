@@ -54,12 +54,13 @@ public class PageFile : IDisposable
 
     public ColorRgba32[] TranscodeTile(int pageIndex, int tileIndex, string textureFormat)
     {
+        Console.WriteLine($"Transcoding page {pageIndex}, tile {tileIndex}");
         long startPageOffset = pageIndex * _tileSet.CustomPageSize;
         long pageOffset = pageIndex == 0 ? 0x18 : startPageOffset;
 
         _stream.Position = pageOffset + (tileIndex * sizeof(uint)) + 4;
-        uint tileOffet = (uint)startPageOffset + _stream.ReadUInt32();
-        _stream.Position = tileOffet;
+        long tileOffset = startPageOffset + _stream.ReadUInt32();
+        _stream.Position = tileOffset;
 
         // Tile header
         uint codec = _stream.ReadUInt32();
@@ -122,6 +123,7 @@ public class PageFile : IDisposable
                 "BC4" => CompressionFormat.Bc4,
                 "BC3" => CompressionFormat.Bc3,
                 "BC1" => CompressionFormat.Bc1,
+                _ => throw new NotImplementedException($"Format {textureFormat} not implemented"),
             };
 
             var colors = new BcDecoder();
