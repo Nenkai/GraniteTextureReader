@@ -51,7 +51,7 @@ The official website used to sit at https://graphinesoftware.com/
 * [Use Cases](https://web.archive.org/web/20210616111752/http://graphinesoftware.com:80/our-technology/use-cases)
 
 Other libraries that can handle creating such files:
-* [BG3VTexSuite](https://github.com/Brucephalus/BG3VTexSuite/tree/a8a96277c6f21db4c598faf3cb1a7541ff94c48e), which quite literally seems to contain the proprietary official SDK tools (V5) along with traces of decompilation attempts. This repo was somehow available prior to BG3's release date - [original readme before it was deleted](https://github.com/Brucephalus/BG3VTexSuite/commit/8938f15942d38774eca2a91a477f86a03b3871ce)
+* [BG3VTexSuite](https://github.com/Brucephalus/BG3VTexSuite/tree/a8a96277c6f21db4c598faf3cb1a7541ff94c48e), which quite literally seems to contain the proprietary official SDK tools (Graphine Granite Toolset V5) along with traces of decompilation attempts. T[original readme before it was deleted](https://github.com/Brucephalus/BG3VTexSuite/commit/8938f15942d38774eca2a91a477f86a03b3871ce)
 * [LSLib](https://github.com/Norbyte/lslib), for creating tile sets for BG3
 
 ## Building
