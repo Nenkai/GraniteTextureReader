@@ -1,6 +1,14 @@
 # GraniteTextureReader
 
-Texture Reader/Extractor for [Granite SDK](https://unity.com/products/granite-sdk) files (.gts/.gtp). This tool was primarly made with Granblue Fantasy: Relink in mind, but should also support extracting from Unity games using [Streaming Virtual Texturing](https://docs.unity3d.com/Manual/svt-streaming-virtual-texturing.html).
+Texture Reader/Extractor for [Granite SDK](https://web.archive.org/web/20240229035708/https://unity.com/products/granite-sdk) files (.gts/.gtp). This tool was primarly made with Granblue Fantasy: Relink in mind, but should also support extracting from Unity games using [Streaming Virtual Texturing](https://docs.unity3d.com/Manual/svt-streaming-virtual-texturing.html).
+
+The Granite SDK has long been acquired by Unity and for the most part shelved (main page on the Unity site is gone), so updates to the format are unlikely.
+
+It is known to be used in:
+* Granblue Fantasy: Relink (proprietary, long development cycle, likely acquired Granite licensing before Unity acquired it)
+* Baldur's Gate 3 (same as above)
+* Conan Exiles (Unreal)
+* The very few Unity games that opt-in to use [Streaming Virtual Texturing](https://docs.unity3d.com/Manual/svt-streaming-virtual-texturing.html), which has been marked as experimental for years and at this point abandoned yet still available
 
 ### Features
 
@@ -33,6 +41,18 @@ More commands are available by just running the command and reading the command/
 ## Documentation
 
 File format documentation/010 Editor Template is available [here](https://github.com/Nenkai/010GameTemplates/blob/main/Graphine/Granite%20SDK/TileSet_GTS.bt).
+
+The official website used to sit at https://graphinesoftware.com/
+
+* [Archived Homepage](https://web.archive.org/web/20210926130802/http://graphinesoftware.com:80/granite-sdk)
+* [SDK PDF](https://web.archive.org/web/20240629135242/https://graphinesoftware.com/sites/default/files/shared/whitepaper_granite_sdk5.pdf)
+* [More Details](https://web.archive.org/web/20181220200828/https://graphinesoftware.com/texture-streaming)
+* [More Details 2](https://web.archive.org/web/20210616105443/http://graphinesoftware.com:80/our-technology/how-it-works)
+* [Use Cases](https://web.archive.org/web/20210616111752/http://graphinesoftware.com:80/our-technology/use-cases)
+
+Other libraries that can handle creating such files:
+* [BG3VTexSuite](https://github.com/Brucephalus/BG3VTexSuite/tree/a8a96277c6f21db4c598faf3cb1a7541ff94c48e), which quite literally seems to contain the proprietary official SDK tools (V5) along with traces of decompilation attempts. This repo was somehow available prior to BG3's release date
+* [LSLib](https://github.com/Norbyte/lslib), for creating tile sets for BG3
 
 ## Building
 
