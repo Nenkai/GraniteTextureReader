@@ -54,7 +54,9 @@ public class PageFile : IDisposable
 
     public ColorRgba32[] TranscodeTile(int pageIndex, int tileIndex, string textureFormat)
     {
+#if DEBUG
         Console.WriteLine($"Transcoding page {pageIndex}, tile {tileIndex}");
+#endif
         long startPageOffset = pageIndex * _tileSet.CustomPageSize;
         long pageOffset = pageIndex == 0 ? 0x18 : startPageOffset;
 
