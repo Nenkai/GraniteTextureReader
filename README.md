@@ -8,6 +8,7 @@ It is known to be used in:
 * Granblue Fantasy: Relink (proprietary, long development cycle, likely acquired Granite licensing before Unity acquired it)
 * Baldur's Gate 3 (same as above)
 * Conan Exiles (Unreal)
+* Mount & Blade II: Bannerlord (Unreal)
 * The very few Unity games that opt-in to use [Streaming Virtual Texturing](https://docs.unity3d.com/Manual/svt-streaming-virtual-texturing.html), which has been marked as experimental for years and at this point abandoned yet still available
 
 ### Features
