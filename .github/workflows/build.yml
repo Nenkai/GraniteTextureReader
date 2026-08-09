@@ -1,0 +1,542 @@
+name: Build
+
+# Builds GraniteTextureReader for Windows and Linux as fully self-contained,
+# single-file executables: the .NET runtime and every NuGet dependency are
+# bundled into the produced binary, so the machine running it needs no .NET
+# installation and no extra references.
+#
+# Manual runs (Actions -> Build -> "Run workflow") expose every knob below.
+# Pushes to master/main, PRs and `v*` tags build with the defaults.
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which targets to build"
+        type: choice
+        default: all
+        options:
+          - all
+          - windows
+          - linux
+          - x64-only
+      configuration:
+        description: "Build configuration"
+        type: choice
+        default: Release
+        options:
+          - Release
+          - Debug
+      version:
+        description: "Version to stamp (e.g. 1.1.5). Empty = read from Program.cs"
+        type: string
+        required: false
+        default: ""
+      single_file:
+        description: "Bundle everything into one executable"
+        type: boolean
+        default: true
+      ready_to_run:
+        description: "ReadyToRun AOT precompilation (faster startup, bigger file)"
+        type: boolean
+        default: true
+      invariant_globalization:
+        description: "Invariant globalization (drops the libicu requirement on Linux)"
+        type: boolean
+        default: true
+      trimmed:
+        description: "Trim unused IL (smaller, but may break CommandLineParser reflection)"
+        type: boolean
+        default: false
+      create_release:
+        description: "Publish the archives as a draft GitHub release"
+        type: boolean
+        default: false
+      release_tag:
+        description: "Tag for that release. Empty = v<version>"
+        type: string
+        required: false
+        default: ""
+  push:
+    # No paths-ignore here on purpose: a `v*` tag placed on a docs-only commit
+    # must still produce release binaries.
+    branches: [master, main]
+    tags: ["v*"]
+  pull_request:
+    branches: [master, main]
+    paths-ignore:
+      - "**.md"
+      - "LICENSE.txt"
+      - ".gitignore"
+      - ".gitattributes"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  APP_NAME: GraniteTextureReader
+  SOLUTION: GraniteTextureReader.sln
+  CLI_PROJECT: GraniteTextureReader.CLI/GraniteTextureReader.CLI.csproj
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_GENERATE_ASPNET_CERTIFICATE: false
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Resolves the run's options once so the build matrix stays declarative.
+  # `inputs.*` is empty on push/pull_request, hence the ${VAR:-default} dance.
+  # ---------------------------------------------------------------------------
+  configure:
+    name: Configure
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      targets: ${{ steps.matrix.outputs.targets }}
+      configuration: ${{ steps.opts.outputs.configuration }}
+      version: ${{ steps.opts.outputs.version }}
+      label: ${{ steps.opts.outputs.label }}
+      informational: ${{ steps.opts.outputs.informational }}
+      publish_props: ${{ steps.opts.outputs.publish_props }}
+      release_tag: ${{ steps.opts.outputs.release_tag }}
+      is_release: ${{ steps.opts.outputs.is_release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve build options
+        id: opts
+        shell: bash
+        env:
+          IN_CONFIGURATION: ${{ inputs.configuration }}
+          IN_VERSION: ${{ inputs.version }}
+          IN_SINGLE_FILE: ${{ inputs.single_file }}
+          IN_READY_TO_RUN: ${{ inputs.ready_to_run }}
+          IN_INVARIANT: ${{ inputs.invariant_globalization }}
+          IN_TRIMMED: ${{ inputs.trimmed }}
+          IN_CREATE_RELEASE: ${{ inputs.create_release }}
+          IN_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          configuration="${IN_CONFIGURATION:-Release}"
+          single_file="${IN_SINGLE_FILE:-true}"
+          ready_to_run="${IN_READY_TO_RUN:-true}"
+          invariant="${IN_INVARIANT:-true}"
+          trimmed="${IN_TRIMMED:-false}"
+
+          # Version: explicit input > pushed tag > the const in Program.cs.
+          if [ -n "${IN_VERSION}" ]; then
+            version="${IN_VERSION}"
+            pinned=true
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            version="${GITHUB_REF#refs/tags/}"
+            version="${version#v}"
+            pinned=true
+          else
+            version="$(grep -oP 'public const string Version = "\K[^"]+' \
+              GraniteTextureReader.CLI/Program.cs || true)"
+            version="${version:-0.0.0}"
+            pinned=false
+          fi
+
+          # File-name label: tagged/pinned builds stay clean, CI builds get the
+          # run number so successive artifacts never collide.
+          if [ "${pinned}" = "true" ]; then
+            label="${version}"
+          else
+            label="${version}-b${GITHUB_RUN_NUMBER}"
+          fi
+          informational="${label}+${GITHUB_SHA::7}"
+
+          # -p:Version only accepts a numeric System.Version-ish string.
+          numeric=""
+          if [[ "${version}" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+            numeric="${version}"
+          else
+            echo "::warning::'${version}' is not a numeric version; only InformationalVersion will be stamped."
+          fi
+
+          props="-p:SelfContained=true"
+          props="${props} -p:PublishSingleFile=${single_file}"
+          props="${props} -p:IncludeNativeLibrariesForSelfExtract=${single_file}"
+          props="${props} -p:EnableCompressionInSingleFile=${single_file}"
+          props="${props} -p:PublishReadyToRun=${ready_to_run}"
+          props="${props} -p:PublishReadyToRunComposite=false"
+          props="${props} -p:InvariantGlobalization=${invariant}"
+          props="${props} -p:PublishTrimmed=${trimmed}"
+          if [ "${trimmed}" = "true" ]; then
+            # `partial` only trims assemblies that opted in, which keeps
+            # CommandLineParser's reflection over the verb types working.
+            props="${props} -p:TrimMode=partial"
+          fi
+          props="${props} -p:SatelliteResourceLanguages=en"
+          props="${props} -p:DebugType=none -p:DebugSymbols=false"
+          if [ -n "${numeric}" ]; then
+            props="${props} -p:Version=${numeric}"
+          fi
+          props="${props} -p:InformationalVersion=${informational}"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            is_release=true
+            release_tag="${GITHUB_REF#refs/tags/}"
+          elif [ "${IN_CREATE_RELEASE:-false}" = "true" ]; then
+            is_release=true
+            release_tag="${IN_RELEASE_TAG:-v${version}}"
+          else
+            is_release=false
+            release_tag=""
+          fi
+
+          {
+            echo "configuration=${configuration}"
+            echo "version=${version}"
+            echo "label=${label}"
+            echo "informational=${informational}"
+            echo "publish_props=${props}"
+            echo "release_tag=${release_tag}"
+            echo "is_release=${is_release}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### GraniteTextureReader ${label}"
+            echo
+            echo "| Option | Value |"
+            echo "| --- | --- |"
+            echo "| Configuration | \`${configuration}\` |"
+            echo "| Single file | \`${single_file}\` |"
+            echo "| ReadyToRun | \`${ready_to_run}\` |"
+            echo "| Invariant globalization | \`${invariant}\` |"
+            echo "| Trimmed | \`${trimmed}\` |"
+            echo "| Self-contained | \`true\` (no .NET runtime needed to run) |"
+            echo "| Release | \`${is_release}\` ${release_tag:+(\`${release_tag}\`)} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve target matrix
+        id: matrix
+        shell: bash
+        env:
+          IN_PLATFORMS: ${{ inputs.platforms }}
+        run: |
+          set -euo pipefail
+
+          # smoke = the produced binary can actually be executed by the runner
+          # that built it (win-x86 runs fine on the x64 Windows image).
+          all='[
+            {"rid":"win-x64",        "os":"windows-latest","platform":"windows","archive":"zip",   "smoke":true},
+            {"rid":"win-x86",        "os":"windows-latest","platform":"windows","archive":"zip",   "smoke":true},
+            {"rid":"win-arm64",      "os":"windows-latest","platform":"windows","archive":"zip",   "smoke":false},
+            {"rid":"linux-x64",      "os":"ubuntu-latest", "platform":"linux",  "archive":"tar.gz","smoke":true},
+            {"rid":"linux-arm64",    "os":"ubuntu-latest", "platform":"linux",  "archive":"tar.gz","smoke":false},
+            {"rid":"linux-musl-x64", "os":"ubuntu-latest", "platform":"linux",  "archive":"tar.gz","smoke":false}
+          ]'
+
+          case "${IN_PLATFORMS:-all}" in
+            windows)  filter='.platform == "windows"' ;;
+            linux)    filter='.platform == "linux"' ;;
+            x64-only) filter='.rid == "win-x64" or .rid == "linux-x64"' ;;
+            *)        filter='true' ;;
+          esac
+
+          include="$(jq -c "[ .[] | select(${filter}) ]" <<<"${all}")"
+          echo "matrix={\"include\":${include}}" >> "$GITHUB_OUTPUT"
+          echo "targets=$(jq -r '[.[].rid] | join(", ")' <<<"${include}")" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # One self-contained publish per runtime identifier.
+  # ---------------------------------------------------------------------------
+  build:
+    name: ${{ matrix.rid }}
+    needs: configure
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.configure.outputs.matrix) }}
+    env:
+      RID: ${{ matrix.rid }}
+      CONFIGURATION: ${{ needs.configure.outputs.configuration }}
+      ARCHIVE_BASE: GraniteTextureReader-${{ needs.configure.outputs.label }}-${{ matrix.rid }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          # The CLI targets net9.0, GraniteLib targets net8.0.
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ matrix.rid }}-${{ hashFiles('**/*.csproj', 'nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-${{ matrix.rid }}-
+            ${{ runner.os }}-nuget-
+
+      - name: Show toolchain
+        shell: bash
+        run: dotnet --info
+
+      # Restore is RID-scoped and knows about ReadyToRun/trimming so the
+      # runtime pack and the crossgen2 compiler land in the cache up front,
+      # letting the publish below run with --no-restore.
+      #
+      # nuget.sixlabors.com (needed for SixLabors.ImageSharp.Textures) has a
+      # history of transient failures, so restore is retried, and the last
+      # attempt tolerates a dead source in case the cache already has the
+      # packages.
+      - name: Restore (${{ matrix.rid }})
+        shell: bash
+        env:
+          PUBLISH_PROPS: ${{ needs.configure.outputs.publish_props }}
+        run: |
+          set -uo pipefail
+          # shellcheck disable=SC2206  # PUBLISH_PROPS is a deliberate argument list
+          restore_args=(restore "$SOLUTION" -r "$RID" --nologo -v minimal $PUBLISH_PROPS)
+          attempts=4
+          for attempt in $(seq 1 "$attempts"); do
+            extra=()
+            if [ "$attempt" -eq "$attempts" ]; then
+              echo "::warning::Falling back to --ignore-failed-sources for the final restore attempt."
+              extra+=(--ignore-failed-sources)
+            fi
+            if dotnet "${restore_args[@]}" ${extra[@]+"${extra[@]}"}; then
+              echo "Restore succeeded on attempt ${attempt}."
+              exit 0
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              delay=$((attempt * attempt * 5))
+              echo "::warning::Restore attempt ${attempt} failed; retrying in ${delay}s."
+              sleep "${delay}"
+            fi
+          done
+          echo "::error::Restore failed after 4 attempts."
+          exit 1
+
+      - name: Publish self-contained (${{ matrix.rid }})
+        shell: bash
+        env:
+          PUBLISH_PROPS: ${{ needs.configure.outputs.publish_props }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086  # PUBLISH_PROPS must word-split into flags
+          dotnet publish "$CLI_PROJECT" \
+            -c "$CONFIGURATION" \
+            -r "$RID" \
+            --self-contained true \
+            --no-restore \
+            --nologo \
+            -v minimal \
+            $PUBLISH_PROPS \
+            -o "publish/$RID"
+
+      - name: Stage and archive (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = "publish/$env:RID"
+
+          # Ship it under the name the README documents.
+          $host_exe = Join-Path $out 'GraniteTextureReader.CLI.exe'
+          if (Test-Path $host_exe) {
+            Move-Item -Force $host_exe (Join-Path $out 'GraniteTextureReader.exe')
+          }
+          Get-ChildItem $out -Recurse -Filter *.pdb -ErrorAction SilentlyContinue | Remove-Item -Force
+          Copy-Item README.md, LICENSE.txt $out -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $zip = "artifacts/$env:ARCHIVE_BASE.zip"
+          Compress-Archive -Path "$out/*" -DestinationPath $zip -CompressionLevel Optimal
+
+          # LF-terminated and two-space separated so the concatenated
+          # SHA256SUMS.txt stays readable by `sha256sum -c`.
+          $sum = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "$zip.sha256"),
+            "$sum  $env:ARCHIVE_BASE.zip`n")
+
+          Get-ChildItem $out | Format-Table Name, Length
+
+      - name: Stage and archive (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="publish/$RID"
+
+          if [ -f "$out/GraniteTextureReader.CLI" ]; then
+            mv -f "$out/GraniteTextureReader.CLI" "$out/GraniteTextureReader"
+          fi
+          chmod +x "$out/GraniteTextureReader"
+          find "$out" -name '*.pdb' -delete
+          cp README.md LICENSE.txt "$out/" 2>/dev/null || true
+
+          mkdir -p artifacts
+          # -C + '.' keeps the archive flat and preserves the executable bit.
+          tar -czf "artifacts/${ARCHIVE_BASE}.tar.gz" -C "$out" .
+          ( cd artifacts && sha256sum "${ARCHIVE_BASE}.tar.gz" > "${ARCHIVE_BASE}.tar.gz.sha256" )
+
+          ls -la "$out"
+
+      # Proves the binary starts without any .NET runtime on the box: a
+      # self-contained app never resolves a shared framework, and the exit code
+      # here comes from the bundled runtime itself.
+      - name: Smoke test (${{ matrix.rid }})
+        if: matrix.smoke
+        shell: bash
+        env:
+          DOTNET_ROOT: ""
+          DOTNET_MULTILEVEL_LOOKUP: "0"
+        run: |
+          set -euo pipefail
+          out="publish/$RID"
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            exe="$out/GraniteTextureReader.exe"
+          else
+            exe="$out/GraniteTextureReader"
+          fi
+
+          if output="$("$exe" 2>&1)"; then
+            status=0
+          else
+            status=$?
+          fi
+          echo "$output"
+          if [ "$status" -ne 0 ]; then
+            echo "::error::$exe exited with $status"
+            exit 1
+          fi
+          if ! grep -q "GraniteTextureReader" <<<"$output"; then
+            echo "::error::Unexpected output from $exe"
+            exit 1
+          fi
+          if ! grep -q "extract-all" <<<"$output"; then
+            echo "::error::Verb listing missing; the command line parser did not initialise."
+            exit 1
+          fi
+          echo "Smoke test passed."
+
+      - name: Report native library requirements
+        if: matrix.rid == 'linux-x64'
+        continue-on-error: true
+        shell: bash
+        run: |
+          {
+            echo "<details><summary>linux-x64 host dependencies (<code>ldd</code>)</summary>"
+            echo
+            echo '```'
+            ldd "publish/$RID/GraniteTextureReader" 2>&1 || true
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summarise
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          {
+            echo "### \`$RID\`"
+            echo
+            echo "| Archive | Size | Verified |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          archive=""
+          for candidate in "artifacts/${ARCHIVE_BASE}.zip" "artifacts/${ARCHIVE_BASE}.tar.gz"; do
+            if [ -f "$candidate" ]; then
+              archive="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$archive" ]; then
+            echo "| :x: no archive produced | | |" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "| \`$(basename "$archive")\` | $(du -h "$archive" | cut -f1) | ${{ matrix.smoke && ':white_check_mark: executed on the runner' || ':heavy_minus_sign: cross-built, not executed' }} |" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE_BASE }}
+          path: |
+            artifacts/${{ env.ARCHIVE_BASE }}.*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  # ---------------------------------------------------------------------------
+  # Collects every archive, emits a combined SHA256SUMS and (optionally)
+  # publishes a release.
+  # ---------------------------------------------------------------------------
+  package:
+    name: Package
+    needs: [configure, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: GraniteTextureReader-*
+          merge-multiple: true
+
+      - name: Build checksum manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          cat ./*.sha256 > SHA256SUMS.txt
+          rm -f ./*.sha256
+          # shellcheck disable=SC2016  # markdown table pipes, nothing to expand
+          {
+            echo
+            echo "### Artifacts"
+            echo
+            echo '| Archive | Size | SHA256 |'
+            echo '| --- | --- | --- |'
+            while read -r sum name; do
+              printf '| `%s` | %s | `%s` |\n' "$name" "$(du -h "$name" | cut -f1)" "$sum"
+            done < SHA256SUMS.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat SHA256SUMS.txt
+
+      - name: Upload combined bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: GraniteTextureReader-${{ needs.configure.outputs.label }}-all
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Publish release
+        if: needs.configure.outputs.is_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.configure.outputs.release_tag }}
+          name: GraniteTextureReader ${{ needs.configure.outputs.version }}
+          # Manual runs stage a draft so the archives can be checked before
+          # anyone can download them; tag pushes publish straight away.
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          # `dist/*` rather than per-extension globs: a windows-only or
+          # linux-only run would otherwise trip fail_on_unmatched_files.
+          files: dist/*
