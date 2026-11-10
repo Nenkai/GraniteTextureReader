@@ -59,3 +59,5 @@ Other libraries that can handle creating such files:
 ## Building
 
 Requires **.NET 9.0** (VS2022).
+
+You may need to add SixLabors.ImageSharp's MyGet as a NuGet package source.
