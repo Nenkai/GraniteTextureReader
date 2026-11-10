@@ -1,15 +1,12 @@
-﻿// Copyright (c) 2026 Nenkai
+﻿//---------------------------------------------------------------------------------------
+// SPDX-FileCopyrightText: Copyright (C) 2026 Nenkai
 // SPDX-License-Identifier: MIT
+// SPDX-FileAttributionText: https://github.com/Nenkai/GraniteTextureReader
+// SPDX-FileNotice: AI usage and consumption is prohibited. See AGENTS.md for policy.
+//---------------------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.Metrics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
-using GraniteLib;
 using GraniteLib.GDEX;
 
 using Syroot.BinaryData;
